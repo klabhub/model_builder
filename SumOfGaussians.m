@@ -164,13 +164,9 @@ classdef  SumOfGaussians < ModelBuilder
                  MinPeakWidth = pv.min_peak_width,...
                  NPeaks=self.n_peaks, SortStr='descend');
 
-             cf_idx = arrayfun(@(f) gen.absargmin(x_data - f), cf);
+             cf_idx = arrayfun(@(f) do.argmin(abs(x_data - f)), cf);
              bw_bins = bw./dx;
              bw_bins(bw_bins < 2) = 2; % at least 2 bins necessary
-             
-             % % Does not work in R2023a
-             % [amp, cf] = refinepeaks(y_interp, cf_idx, x_data, LobeWidth=bw_bins, Method='NLS');
-             % cf_idx = arrayfun(@(f) gen.absargmin(x_data - f), cf);
              
              % refine peak estimates for gaussian fitting
              % The peaks must be centered in Gaussians but findpeaks does not force this
@@ -197,7 +193,7 @@ classdef  SumOfGaussians < ModelBuilder
 
                  cfN = cf(iPk);
 
-                 nearest_ch_pt_idx = gen.absargmin(ch_pts_freqs-cfN);
+                 nearest_ch_pt_idx = do.argmin(abs(ch_pts_freqs-cfN));
 
                  % onset slopes
 
@@ -226,18 +222,18 @@ classdef  SumOfGaussians < ModelBuilder
 
                  % use the mean of new and old estimates
                  cf_new = (cfN + mean(x_data([iOnsetN, iOffsetN])))/2;
-                 cf_idx_new = gen.absargmin(x_data-cf_new);
+                 cf_idx_new = do.argmin(abs(x_data-cf_new));
 
                  left_half_amp = mean(y_interp([iOnsetN, cf_idx_new]));
                  right_half_amp = mean(y_interp([cf_idx_new, iOffsetN]));
 
                  local_amps = nan(size(x_data));
                  local_amps(iOnsetN:cf_idx_new) = y_interp(iOnsetN:cf_idx_new);
-                 left_half_max_idx = gen.absargmin(local_amps - left_half_amp);
+                 left_half_max_idx = do.argmin(abs(local_amps - left_half_amp));
 
                  local_amps = nan(size(x_data));
                  local_amps(cf_idx_new:iOffsetN) = y_interp(cf_idx_new:iOffsetN);
-                 right_half_max_idx = gen.absargmin(local_amps - right_half_amp);
+                 right_half_max_idx = do.argmin(abs(local_amps - right_half_amp));
 
                  bw_new = diff(x_data([left_half_max_idx, right_half_max_idx]));
 
@@ -342,7 +338,7 @@ classdef  SumOfGaussians < ModelBuilder
 
                  end
                  
-                 sd_ub = diff(gen.range(self.X_))/3 / (2*sqrt(2*log(2)));
+                 sd_ub = diff(do.range(self.X_))/3 / (2*sqrt(2*log(2)));
                  
                  b_ub = .1;
 

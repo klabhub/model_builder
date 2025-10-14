@@ -46,7 +46,7 @@ for ii = 1:pv.max_iter % start iterations
         pv.nonlcon, pv.options);
     % actual residuals without weights
     R = detrend(fitter.inner_model.R);
-    R_z = gen.robust_z(R);    
+    R_z = do.robust_z(R);    
     isExcld = isExcld | R_z >= pv.abs_z_threshold;
 
     if pv.plot
