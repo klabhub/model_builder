@@ -1,3 +1,4 @@
 [submodule "dataop"]
 	path = dataop
 	url = git@github.com:mert-ozkan/dataop.git
+	branch = submod-dj
