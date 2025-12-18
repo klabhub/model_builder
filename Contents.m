@@ -20,12 +20,12 @@
 %
 % Dependencies - Mathworks Toolboxes
 %   The following Add-Ons are required
-%       * Symbolic Math Toolbox
+%       Symbolic Math Toolbox
 %
 % Dependencies - Third-Party Submodules
 %   Ensure to install initiate submodules recursively after cloning the
 %   repository:
-%       * <a href="https://github.com/mert-ozkan/dataop.git"><dataop></a> - (Simple data operations toolbox)
+%       <a href="https://github.com/mert-ozkan/dataop.git"><dataop></a> - (Simple data operations toolbox)
 %
 % Copyright 2025 Mert Ozkan (KLab) @CMBN, Rutgers University
 % License: MIT
