@@ -19,7 +19,7 @@ classdef  SumOfGaussians < ModelBuilder
 
     properties
         % --- Abstract Properties Implementation from ModelBuilder ---
-        model sym % The main symbolic function, defined in the constructor
+        formula sym % The main symbolic function, defined in the constructor
         x = sym('x'); % Symbolic independent variable
         y = sym('y'); % Symbolic dependent variable
         y_hat = sym('y_hat'); % Symbolic representation of the model's prediction        
@@ -467,7 +467,7 @@ classdef  SumOfGaussians < ModelBuilder
             self.amplitude = sym('a', [self.n_peaks, 1]);
             self.center = sym('mu', [self.n_peaks, 1]);
             self.sd = sym('s', [self.n_peaks, 1]);
-            self.model = sum(self.amplitude .* exp(-(self.x - self.center).^2 ./ (2 * self.sd.^2))) + self.baseline;
+            self.formula = sum(self.amplitude .* exp(-(self.x - self.center).^2 ./ (2 * self.sd.^2))) + self.baseline;
             self.solve_jacobian();
             self.solve_hessian();
             self.lower_bounds = [];

@@ -6,7 +6,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
     % automatically invalidates previous calculations.
 
     properties (Abstract)
-        model sym % The main symbolic function for the model
+        formula sym % The main symbolic function for the model
         x sym     % The symbolic independent variable (e.g., 'x')
         y sym     % The symbolic dependent variable (e.g., 'y')
         y_hat sym % Symbolic representation of the model's prediction
@@ -32,7 +32,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
         
         YHat_ (:, 1) double = []
         J_ (:,:) double = []
-        H_raw_ (:,:,:) double = []
+        H_tensor_ (:,:,:) double = []
         G_ (:,1) double = []
     end
     
@@ -40,7 +40,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
         % --- Public-Facing Properties with On-Demand Computation ---
         W, P, X, Y % weights, parameters, x_data, y_data
         jacobian, hessian
-        YHat, J, H_raw % y_hat, jacobian matrix, hessian matrrix before summation
+        YHat, J, H_tensor % y_hat, jacobian matrix, hessian matrrix before summation
         G % gradient
 
         % --- Other Derived Properties ---
@@ -54,7 +54,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
     %======================================================================
     methods
         function set.W(self, value)
-            if self.verbose; fprintf('>> W changed. Invalidating G, H_raw.\n'); end
+            if self.verbose; fprintf('>> W changed. Invalidating G, H_tensor.\n'); end
             self.W_ = value;
             self.clear_computed_properties('W');
         end
@@ -63,7 +63,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
         end
 
         function set.P(self, value)
-            if self.verbose; fprintf('>> P changed. Invalidating YHat, J, G, H_raw.\n'); end
+            if self.verbose; fprintf('>> P changed. Invalidating YHat, J, G, H_tensor.\n'); end
             self.P_ = value;
             self.clear_computed_properties('P');
         end
@@ -72,7 +72,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
         end
 
         function set.X(self, value)
-            if self.verbose; fprintf('>> X changed. Invalidating YHat, J, G, H_raw.\n'); end
+            if self.verbose; fprintf('>> X changed. Invalidating YHat, J, G, H_tensor.\n'); end
             self.X_ = value;
             self.clear_computed_properties('X');
         end
@@ -81,7 +81,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
         end
 
         function set.Y(self, value)
-            if self.verbose; fprintf('>> Y changed. Invalidating G, H_raw.\n'); end
+            if self.verbose; fprintf('>> Y changed. Invalidating G, H_tensor.\n'); end
             self.Y_ = value;
             self.clear_computed_properties('Y');
         end
@@ -131,11 +131,11 @@ classdef ModelBuilder < matlab.mixin.Copyable
             val = self.G_;
         end
 
-        function val = get.H_raw(self)
-            if isempty(self.H_raw_)
+        function val = get.H_tensor(self)
+            if isempty(self.H_tensor_)
                 self.compute_hessian();
             end
-            val = self.H_raw_;
+            val = self.H_tensor_;
         end
 
     end
@@ -170,8 +170,8 @@ classdef ModelBuilder < matlab.mixin.Copyable
             R = self.W .* self.R;
         end
         function H = get.H(self)
-            if isempty(self.H_raw); H = []; return; end
-            H = squeeze(sum(self.H_raw, 1));
+            if isempty(self.H_tensor); H = []; return; end
+            H = squeeze(sum(self.H_tensor, 1));
         end
 
         function SSR = get.SSR(self)
@@ -192,12 +192,12 @@ classdef ModelBuilder < matlab.mixin.Copyable
             
             if isempty(varargin)
                 % Default to all if no specific properties are requested
-                toCompute = ["YHat", "J", "G", "H_raw"];
+                toCompute = ["YHat", "J", "G", "H_tensor"];
             else
                 toCompute = strings(size(varargin));
                 for i = 1:numel(varargin)
                     toCompute(i) = validatestring(varargin{i}, ...
-                        {'YHat', 'J', 'G', 'H_raw'}, 'compute', 'property to compute');
+                        {'YHat', 'J', 'G', 'H_tensor'}, 'compute', 'property to compute');
                 end
             end
     
@@ -230,7 +230,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
                 P = self.P;
                 X = self.X;
             end
-            YHat = self.compute_(self.model, {self.parameters, self.x}, {P, X});
+            YHat = self.compute_(self.formula, {self.parameters, self.x}, {P, X});
             if self.verbose; fprintf('\tDone. Elapsed time is %.4f seconds.\n', toc(tStart)); end
         end
 
@@ -245,7 +245,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
             end
             
             % 1. Predict the clean signal using the model's formula
-            y_clean = self.predict(p, x_vals);%self.compute_(self.model, {self.parameters, self.x}, {p, x_vals});
+            y_clean = self.predict(p, x_vals);
             
             % 2. Generate Gaussian noise with the specified sigma
             noise = randn(size(y_clean)) * sigma;
@@ -258,7 +258,7 @@ classdef ModelBuilder < matlab.mixin.Copyable
             if self.verbose; 
                 fprintf('Solving symbolic jacobian_...\n'); end
             tStart = tic;
-            self.jacobian_ = self.solve_jacobian_(self.model, self.parameters);
+            self.jacobian_ = self.solve_jacobian_(self.formula, self.parameters);
             if self.verbose; fprintf('\tDone. Elapsed time is %.4f seconds.\n', toc(tStart)); end
         end
 
@@ -294,20 +294,20 @@ classdef ModelBuilder < matlab.mixin.Copyable
         end
 
         function compute_hessian(self)
-            if self.verbose; fprintf('Computing H_raw_...\n'); end
+            if self.verbose; fprintf('Computing H_tensor_...\n'); end
             tStart = tic;
             if isempty(self.R) || isempty(self.J)
-                self.H_raw_ = [];
+                self.H_tensor_ = [];
                 if self.verbose; fprintf('\tCannot compute: R or J is empty.\n'); end
                 return;
             end
             H_tensor = self.compute_(self.hessian, {self.parameters, self.x}, {self.P, self.X});
             if isscalar(unique(size(H_tensor)))
 
-                self.H_raw_ = permute(repmat(H_tensor,[1,1,self.n_sample]),[3,1,2]);
+                self.H_tensor_ = permute(repmat(H_tensor,[1,1,self.n_sample]),[3,1,2]);
                 
             else
-                self.H_raw_ = reshape(H_tensor, [self.n_sample, self.n_param, self.n_param]);
+                self.H_tensor_ = reshape(H_tensor, [self.n_sample, self.n_param, self.n_param]);
             end
             if self.verbose; fprintf('\tDone. Elapsed time is %.4f seconds.\n', toc(tStart)); end
         end      
@@ -358,13 +358,13 @@ classdef ModelBuilder < matlab.mixin.Copyable
             if any(strcmp(source_prop, {'P', 'X'}))
                 self.YHat_ = [];
                 self.J_ = [];
-                self.H_raw_ = [];
+                self.H_tensor_ = [];
                 self.G_ = [];
             end
             
             if any(strcmp(source_prop, {'Y', 'W'}))
                 self.G_ = [];
-                self.H_raw_ = [];
+                self.H_tensor_ = [];
             end
 
             if any(strcmp(source_prop, {'Y', 'X'}))

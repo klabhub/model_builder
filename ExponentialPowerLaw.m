@@ -15,7 +15,7 @@ classdef ExponentialPowerLaw < ModelBuilder
 
     properties
         % --- Abstract Properties Implementation from ModelBuilder ---
-        model sym % The main symbolic function, defined in the constructor
+        formula sym % The main symbolic function, defined in the constructor
         x = sym('x'); % Symbolic independent variable
         y = sym('y'); % Symbolic dependent variable
         y_hat = sym('y_hat'); % Symbolic representation of the model's prediction
@@ -65,15 +65,15 @@ classdef ExponentialPowerLaw < ModelBuilder
             % Optionally add the exponential knee term
             if self.includeKnee
 
-                self.model = base_model * exp(-self.x / self.knee);
+                self.formula = base_model * exp(-self.x / self.knee);
 
             else
-                self.model = base_model;
+                self.formula = base_model;
             end
 
             % Optionally transform the entire model to log scale for fitting
             if self.inLogScale
-                self.model = log10(self.model);
+                self.formula = log10(self.formula);
             end
 
             if self.verbose; fprintf('\tDone constructing model.\n'); end

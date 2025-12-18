@@ -25,13 +25,13 @@ end
 % res_scalar = 1.4826;
 current_params = p0;
 
-n = fitter.inner_model.n_sample;
+n = fitter.Model.n_sample;
 
 isExcld = false([n,1]);
 
 if pv.plot
     figure;
-    plot(fitter.inner_model.X, fitter.inner_model.Y, Linewidth=2);
+    plot(fitter.Model.X, fitter.Model.Y, Linewidth=2);
     hold on
 end
 for ii = 1:pv.max_iter % start iterations
@@ -45,15 +45,15 @@ for ii = 1:pv.max_iter % start iterations
         current_params, pv.A, pv.b, pv.Aeq, pv.beq, pv.lb, pv.ub, ...
         pv.nonlcon, pv.options);
     % actual residuals without weights
-    R = detrend(fitter.inner_model.R);
+    R = detrend(fitter.Model.R);
     R_z = do.robust_z(R);    
     isExcld = isExcld | R_z >= pv.abs_z_threshold;
 
     if pv.plot
        
-        plot(fitter.inner_model.X, fitter.inner_model.predict());
+        plot(fitter.Model.X, fitter.Model.predict());
         if sum(isExcld)
-            xline(fitter.inner_model.X(isExcld),Alpha=.2);
+            xline(fitter.Model.X(isExcld),Alpha=.2);
         end
         drawnow()
     end
