@@ -1,4 +1,4 @@
-classdef NLLFitter < handle
+classdef NLLFitter < matlab.mixin.Copyable
     % NLLFitter is a simple utility class that computes the Negative
     % Log-Likelihood (NLL) and its derivatives for a given ModelBuilder instance.
     % It is designed to be used with MATLAB's optimization functions.
@@ -38,11 +38,11 @@ classdef NLLFitter < handle
 
             end
             
-            % 1. Estimate the inner model's parameters (e.g., via least-squares)
+            % 1. Estimate the inner model's parameters
             p_inner_est = self.inner_model.estimate(x_data, y_data, varargin{:});
             
             % 2. Calculate the residuals of the inner model
-            YHat = self.inner_model.predict(p_inner_est, x_data);
+            YHat = self.inner_model.predict(p_inner_est, X=x_data);
             R = y_data - YHat;
             
             % 3. Estimate sigma as the standard deviation of the residuals
@@ -157,6 +157,7 @@ classdef NLLFitter < handle
             % Assemble the full Hessian matrix
             H = [H_pp,  H_ps; ...
                  H_ps', H_ss];
+            H = sparse(H);
         end
 
         % Estimate Bounds from data
@@ -177,7 +178,19 @@ classdef NLLFitter < handle
 
         end
 
-        
+    end
+
+    methods (Access = protected)
+        function cpObj = copyElement(self)
+            % 1. Create a shallow copy of the parent object
+            % This copies all value properties (numbers, structs) automatically.
+            cpObj = copyElement@matlab.mixin.Copyable(self);
+            
+            % 2. Deep copy the specific handle property
+            % We check isempty to avoid errors if ChildNode is not assigned.
+            cpObj.inner_model = copy(self.inner_model);
+            
+        end
     end
     
     methods (Access = private)

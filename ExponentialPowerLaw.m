@@ -20,16 +20,14 @@ classdef ExponentialPowerLaw < ModelBuilder
         y = sym('y'); % Symbolic dependent variable
         y_hat = sym('y_hat'); % Symbolic representation of the model's prediction
 
-        % --- Class-Specific Properties ---
-        inLogScale (1,1) logical = true % Flag to compute on a log scale
-        includeKnee (1,1) logical = true       % Flag to include the exponential knee term
-
     end
 
     properties (Dependent)
         % --- Abstract Dependent Property Implementation from ModelBuilder ---
         parameters % Vector of symbolic parameters for this model
 
+        includeKnee (1,1) logical % Flag to include the exponential knee term
+        inLogScale (1,1) logical % Flag to compute on a log scale
         lower_bounds
         upper_bounds
 
@@ -39,6 +37,8 @@ classdef ExponentialPowerLaw < ModelBuilder
 
         lower_bounds_ = []
         upper_bounds_ = []
+        inLogScale_ = true
+        includeKnee_ = false
 
     end
 
@@ -52,31 +52,12 @@ classdef ExponentialPowerLaw < ModelBuilder
                 pv.verbose (1,1) logical = true
             end
             % Assign configuration from name-value pairs
-            self.includeKnee = pv.includeKnee;
-            self.inLogScale = pv.inLogScale;
             self.verbose = pv.verbose;
+            self.inLogScale_ = pv.inLogScale;
+            self.includeKnee_ = pv.includeKnee;
 
-            % --- Model Definition ---
-            if self.verbose; fprintf('Constructing ExponentialPowerLaw model...\n'); end
+            self.make_();
 
-            % Define the core power-law model
-            base_model = self.intercept * (self.x^-self.exponent);
-
-            % Optionally add the exponential knee term
-            if self.includeKnee
-
-                self.model = base_model * exp(-self.x / self.knee);
-
-            else
-                self.model = base_model;
-            end
-
-            % Optionally transform the entire model to log scale for fitting
-            if self.inLogScale
-                self.model = log10(self.model);
-            end
-
-            if self.verbose; fprintf('\tDone constructing model.\n'); end
         end
 
         % --- Abstract Method Implementations from ModelBuilder ---
@@ -120,9 +101,13 @@ classdef ExponentialPowerLaw < ModelBuilder
                 while kneeN < 20
                     % if found an earlier point, it is unlikely to be assc w knee parameter
                     % try again with more ch_pts
-                    knee_idx = findchangepts(y_interp, MaxNumChanges=n_ch_pt, Statistic= "linear");
+                    % knee_idx = findchangepts(y_interp, MaxNumChanges=n_ch_pt, Statistic= "linear");
+                    % if ~isempty(knee_idx)
+                    %     kneeN = 10^log_x_data(max(knee_idx));
+                    % end
+                    knee_idx = findchangepts(y_data, MaxNumChanges=n_ch_pt, Statistic= "linear");
                     if ~isempty(knee_idx)
-                        kneeN = 10^log_x_data(max(knee_idx));
+                        kneeN = x_data(max(knee_idx));
                     end
                     n_ch_pt  = n_ch_pt + 1;
                 end
@@ -133,7 +118,7 @@ classdef ExponentialPowerLaw < ModelBuilder
 
             mdl_for_exp = fitlm(log10(x_data(isBeforeKnee)), y_data(isBeforeKnee));
             exponentN = -mdl_for_exp.Coefficients.Estimate(2);
-            interceptN = 10.^ mdl_for_exp.Coefficients.Estimate(1);
+            interceptN = mdl_for_exp.Coefficients.Estimate(1);
 
             P_est = [interceptN, exponentN, kneeN];
 
@@ -181,7 +166,8 @@ classdef ExponentialPowerLaw < ModelBuilder
          end
 
          function set.lower_bounds(self, value)
-
+             
+             if isempty(value), self.lower_bounds_ = []; return; end
              n_param = numel(value);
              if ~isempty(value) && self.n_param ~= n_param
 
@@ -226,7 +212,8 @@ classdef ExponentialPowerLaw < ModelBuilder
          end
          
          function set.upper_bounds(self, value)
-
+             
+             if isempty(value), self.upper_bounds_ = []; return; end
              n_param = numel(value);
              if ~isempty(value) && self.n_param ~= n_param
 
@@ -240,6 +227,76 @@ classdef ExponentialPowerLaw < ModelBuilder
 
          end
 
+         function set.includeKnee(self, val)
+
+             arguments
+                 self
+                 val (1,1) logical                 
+             end
+
+             if val ~= self.includeKnee_
+
+                 self.includeKnee_ = val;
+                 self.make_();                
+
+             end
+
+         end
+         function i = get.includeKnee(self)
+             i = self.includeKnee_;
+         end
+
+         function set.inLogScale(self, val)
+
+             arguments
+                 self
+                 val (1,1) logical                 
+             end
+
+             if val ~= self.inLogScale
+
+                 self.inLogScale_ = val;
+                 self.make_();                
+
+             end
+
+         end
+
+         function i = get.inLogScale(self)
+             i = self.inLogScale_;
+         end
+         
+    end
+
+    methods (Access = protected)
+
+        function self = make_(self)
+
+            if self.verbose; fprintf('Constructing ExponentialPowerLaw model...\n'); end
+
+            % Define the core power-law model
+            base_model = self.intercept * (self.x^-self.exponent);
+
+            % Optionally add the exponential knee term
+            if self.includeKnee
+
+                self.model = base_model * exp(-self.x / self.knee);
+
+            else
+                self.model = base_model;
+            end
+
+            % Optionally transform the entire model to log scale for fitting
+            if self.inLogScale
+                self.model = log10(self.model);
+            end
+
+            self.solve_jacobian();
+            self.solve_hessian();
+            self.lower_bounds = [];
+            self.upper_bounds = [];
+
+        end
     end
 
 end
