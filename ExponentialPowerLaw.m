@@ -16,9 +16,7 @@ classdef ExponentialPowerLaw < ModelBuilder
     properties
         % --- Abstract Properties Implementation from ModelBuilder ---
         model sym % The main symbolic function, defined in the constructor
-        x = sym('x'); % Symbolic independent variable
-        y = sym('y'); % Symbolic dependent variable
-        y_hat = sym('y_hat'); % Symbolic representation of the model's prediction
+        cacheModel = true
 
     end
 
@@ -49,12 +47,14 @@ classdef ExponentialPowerLaw < ModelBuilder
             arguments
                 pv.includeKnee (1,1) logical = true
                 pv.inLogScale (1,1) logical = true
+                pv.cacheModel (1,1) logical = false
                 pv.verbose (1,1) logical = true
             end
             % Assign configuration from name-value pairs
             self.verbose = pv.verbose;
+            self.cacheModel = pv.cacheModel;
             self.inLogScale_ = pv.inLogScale;
-            self.includeKnee_ = pv.includeKnee;
+            self.includeKnee_ = pv.includeKnee;            
 
             self.make_();
 
@@ -270,33 +270,114 @@ classdef ExponentialPowerLaw < ModelBuilder
 
     methods (Access = protected)
 
-        function self = make_(self)
+        function make_(self)
+            % Generate a cache key based on the model configuration
+            cacheKey = double(self.includeKnee_) + 2 * double(self.inLogScale_);
 
-            if self.verbose; fprintf('Constructing ExponentialPowerLaw model...\n'); end
-
-            % Define the core power-law model
-            base_model = self.intercept * (self.x^-self.exponent);
-
-            % Optionally add the exponential knee term
-            if self.includeKnee
-
-                self.model = base_model * exp(-self.x / self.knee);
-
+            % 1. Check if we have already compiled this model structure
+            if self.cacheModel
+                [cached_data, isCached] = ExponentialPowerLaw.manage_cache_(cacheKey);
             else
-                self.model = base_model;
+                isCached = false;
             end
 
-            % Optionally transform the entire model to log scale for fitting
-            if self.inLogScale
-                self.model = log10(self.model);
-            end
+            if isCached
+                if self.verbose; fprintf('\t(Loading compiled model from cache...)\n'); end
+                self.load_cache_(cached_data);
+            else
+                if self.verbose; fprintf('Constructing ExponentialPowerLaw model...\n'); end
+                % Define the core power-law model
+                base_model = self.intercept * (self.x^-self.exponent);
+                % Optionally add the exponential knee term
+                if self.includeKnee
+                    self.model = base_model * exp(-self.x / self.knee);
+                else
+                    self.model = base_model;
+                end
+                % Optionally transform the entire model to log scale for fitting
+                if self.inLogScale
+                    self.model = log10(self.model);
+                end
+                self.solve_model();
+                self.solve_jacobian();
+                self.solve_hessian();
 
-            self.solve_jacobian();
-            self.solve_hessian();
+                % Cache the results if enabled
+                if self.cacheModel
+                    self.cache_(cacheKey);
+                end
+            end
+            
             self.lower_bounds = [];
             self.upper_bounds = [];
 
         end
+
+        function load_cache_(self, cached_data)
+            % --- LOAD FROM CACHE ---
+            % Restore Symbolic Properties
+            % For EPL, parameter names are constants, but model is dynamic
+            self.model = cached_data.sym_props.model;
+            
+            % Restore Compiled Function Handles
+            self.model_func_    = cached_data.funcs.model;
+            self.jacobian_func_ = cached_data.funcs.jacobian;
+            self.hessian_func_  = cached_data.funcs.hessian;
+            
+            % Restore cached derivatives
+            self.jacobian_ = cached_data.derivs.jacobian;
+            self.hessian_  = cached_data.derivs.hessian;
+        end
+        
+        function cache_(self, cacheKey)
+            % --- SAVE TO CACHE ---
+            data_to_cache = struct();
+            
+            % 1. Save Symbolic Definitions
+            % No need to save intercept/exponent/knee as they are constants
+            data_to_cache.sym_props.model = self.model;
+            
+            % 2. Save Compiled Functions
+            data_to_cache.funcs.model    = self.model_func_;
+            data_to_cache.funcs.jacobian = self.jacobian_func_;
+            data_to_cache.funcs.hessian  = self.hessian_func_;
+            
+            % 3. Save Derivatives
+            data_to_cache.derivs.jacobian = self.jacobian_;
+            data_to_cache.derivs.hessian  = self.hessian_;
+            
+            % Store in static memory
+            ExponentialPowerLaw.manage_cache_(cacheKey, data_to_cache);
+        end
     end
 
+    % --- Caching Methods ---
+    methods (Static)
+        function clear_cache()
+            % Utility to wipe memory if needed
+            clear ExponentialPowerLaw.manage_cache_;
+        end
+    end
+    methods (Static, Access = protected)
+        function [data, is_cached] = manage_cache_(key, new_data)
+            % This variable persists in memory between function calls
+            persistent epl_cache_
+            % Initialize cache if it doesn't exist
+            if isempty(epl_cache_)
+                epl_cache_ = containers.Map('KeyType', 'double', 'ValueType', 'any');
+            end
+            % If new data is provided, save it (Setter Mode)
+            if nargin > 1
+                epl_cache_(key) = new_data;
+            end
+            % Check if data exists (Getter Mode)
+            if epl_cache_.isKey(key)
+                data = epl_cache_(key);
+                is_cached = true;
+            else
+                data = [];
+                is_cached = false;
+            end
+        end
+    end
 end

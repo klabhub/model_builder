@@ -1,4 +1,4 @@
-function [matched_params, nonmatching_params] = synch_peak_parameters_(target, source, tol)
+function varargout = synch_peak_parameters_(target, source, tol)
 % SYNCH_PEAKS_ Matches source peaks to target peaks based on center frequency.
 %
 %   [matching_target, nonmatching_target, nonmatching_source] = ...
@@ -36,9 +36,8 @@ if n_target > 0 && n_source > 0
     s_freqs = source_mat(:, 2)';
     dist_matrix = abs(t_freqs - s_freqs);
 else
-    matched_params = [];
-    nonmatching_params = [target, source];
-    return
+    varargout = {[], [target, source]};
+    return;
 end
 
 % Keep track of which indices have been matched
@@ -93,5 +92,19 @@ nm_source_rows = source_mat(~source_matched_mask, :);
 nonmatching_params = nm_source_rows;%[nm_source_rows; nm_target_rows];
 nonmatching_params = nonmatching_params(:)';
 % nonmatching_source = nm_source_rows(:)';
+
+varargout = cell(1, nargout);
+varargout{1} = matched_params;
+varargout{2} = nonmatching_params;
+if nargout > 2
+    
+    target_matched_mask = repmat(target_matched_mask,1,3);
+    varargout{3} = target_matched_mask(:);
+    if nargout > 3
+        source_matched_mask = repmat(source_matched_mask,1,3);
+        varargout{4} = source_matched_mask(:);
+    end
+
+end
 
 end
