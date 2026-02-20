@@ -122,6 +122,13 @@ classdef ExponentialPowerLaw < ModelBuilder
 
             P_est = [interceptN, exponentN, kneeN];
 
+            lowerB = P_est<self.lower_bounds;
+            upperB = P_est>self.upper_bounds;
+
+            P_est(lowerB) = self.lower_bounds(lowerB);
+            P_est(upperB) = self.upper_bounds(upperB);
+
+
         end
 
         % --- GET Methods ---
