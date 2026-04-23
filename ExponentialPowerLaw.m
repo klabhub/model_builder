@@ -71,15 +71,19 @@ classdef ExponentialPowerLaw < ModelBuilder
             kneeN = [];
             isBeforeKnee = false(size(x_data));
             isBeforeKnee(1:round(numel(x_data)/2)) = true;
-            if self.includeKnee
 
-                % check if the data is regularly-spaced
-                if ~isscalar(unique(diff(x_data)))
+            % Linear interp if freqs contain breaks
+            [y_interp, x_interp] = self.interpolate_breaks_(y_data, x_data);
 
-                    % interpolate the breaks
-                    [y_data, x_data] = self.interpolate_breaks_(y_data, x_data);
+            % SGOLAY Filter to smooth the aperiodic data
+            % fl is the length of the moving window
+            fl = floor(numel(x_interp)/4);
+            if ~mod(fl,2), fl = fl+1; end % must be odd
+            % m=1 for linear
+            y_interp = sgolayfilt(y_interp, 1, fl);
 
-                end
+            
+            if self.includeKnee               
 
                 % The following function finds changes in the local slope. A knee would
                 % exist at such conjunction
@@ -92,31 +96,27 @@ classdef ExponentialPowerLaw < ModelBuilder
                 % we first need to upsample y_data to be regularly spaced
                 % in log-log scale.
 
-                log_x_data = linspace(log10(min(x_data)), log10(max(x_data)), numel(x_data))';
-                y_interp = interp1(log10(x_data), y_data, log_x_data, 'linear');
-
-
                 kneeN = 0;
                 n_ch_pt = 1;                
-                while kneeN < 20
+                while kneeN < 10
                     % if found an earlier point, it is unlikely to be assc w knee parameter
                     % try again with more ch_pts
                     % knee_idx = findchangepts(y_interp, MaxNumChanges=n_ch_pt, Statistic= "linear");
                     % if ~isempty(knee_idx)
                     %     kneeN = 10^log_x_data(max(knee_idx));
                     % end
-                    knee_idx = findchangepts(y_data, MaxNumChanges=n_ch_pt, Statistic= "linear");
+                    knee_idx = findchangepts(y_interp, MaxNumChanges=n_ch_pt, Statistic= "linear");
                     if ~isempty(knee_idx)
-                        kneeN = x_data(max(knee_idx));
+                        kneeN = x_interp(max(knee_idx));
                     end
                     n_ch_pt  = n_ch_pt + 1;
                 end
 
                 % Check if knee estimate is within predesignated bounds
-                isBeforeKnee = x_data <= kneeN;
+                isBeforeKnee = x_interp <= kneeN;
             end
 
-            mdl_for_exp = fitlm(log10(x_data(isBeforeKnee)), y_data(isBeforeKnee));
+            mdl_for_exp = fitlm(log10(x_interp(isBeforeKnee)), y_interp(isBeforeKnee));
             exponentN = -mdl_for_exp.Coefficients.Estimate(2);
             interceptN = mdl_for_exp.Coefficients.Estimate(1);
 

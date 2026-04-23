@@ -165,9 +165,9 @@ classdef ModelBuilder < matlab.mixin.Copyable
                 y_data = y_data.*self.W_;
             end
 
-            avg = mean(y_data);
+            avg = mean(y_data(:));
             n_params0 = abs(avg) >= eps; % i.e., 0 if avg = 0, else 1
-            aic0 = calculate_aic_(y_data, n_params0);
+            aic0 = calculate_aic_(y_data(:), n_params0);
             if n_params0
                 fit0 = avg;
                 type0 = 'intercept';

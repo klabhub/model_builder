@@ -152,13 +152,8 @@ classdef  SumOfGaussians < ModelBuilder
             y_data = y_data(xInPeakSearch);
 
             % Linear interp if freqs contain breaks
-            if ~isscalar(unique(diff(x_data)))
-
-                [y_interp, x_interp] = self.interpolate_breaks_(y_data, x_data);
-
-            end
-
-
+            [y_interp, x_interp] = self.interpolate_breaks_(y_data, x_data);
+            
             % estimate min prominence threshold
             % flatten by detrending
             dx = mode(diff(x_interp));
@@ -176,7 +171,7 @@ classdef  SumOfGaussians < ModelBuilder
                 x_interp, ...
                 MinPeakDistance = pv.min_peak_distance, ...
                 MinPeakProminence= p_thr,...
-                MinPeakWidth = pv.min_peak_width,...
+                MinPeakWidth = pv.min_peak_width/2,... % FWHM tend to appear smaller 
                 NPeaks=self.n_peaks, SortStr='descend');
 
             cf_idx = arrayfun(@(f) do.argmin(abs(x_interp - f)), cf);
@@ -282,6 +277,7 @@ classdef  SumOfGaussians < ModelBuilder
 
             p = [self.amplitude, self.center, self.sd];
             p = [p(:); self.baseline];
+            p= p(:);
             p = reshape(p, [1, numel(p)]);
 
         end
@@ -306,9 +302,9 @@ classdef  SumOfGaussians < ModelBuilder
                 else
                     cf_lb = self.min_peak_frequency;
                 end
-                sd_lb = 0;%self.min_peak_width / sqrt(2*log(2)); % transform from fwhm to sd
+                sd_lb = self.min_peak_width / (2*sqrt(2*log(2))); % transform from fwhm to sd
 
-                b_lb = -.1;
+                b_lb = -.2;
 
                 b = [amp_lb, cf_lb, sd_lb, b_lb];
                 self.lower_bounds = b;
@@ -364,9 +360,9 @@ classdef  SumOfGaussians < ModelBuilder
 
                 end
 
-                sd_ub = diff(do.range(self.X_))/3 / (2*sqrt(2*log(2)));
+                sd_ub = diff(do.range(self.X_));% / (2*sqrt(2*log(2)));
 
-                b_ub = .1;
+                b_ub = .2;
 
                 b = [amp_ub, cf_ub, sd_ub, b_ub];
                 self.upper_bounds = b;
